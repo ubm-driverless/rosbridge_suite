@@ -77,7 +77,8 @@ class Subscription:
 
     def unregister(self):
         """Unsubscribes this subscription and cleans up resources"""
-        manager.unsubscribe(self.client_id, self.topic)
+        raw = self.compression == "cbor-raw"
+        manager.unsubscribe(self.client_id, self.topic, raw=raw)
         with self.handler_lock:
             self.handler.finish(block=False)
         self.clients.clear()
@@ -204,7 +205,6 @@ class Subscription:
 
 
 class Subscribe(Capability):
-
     subscribe_msg_fields = [
         (True, "topic", str),
         (False, "type", str),
@@ -238,13 +238,17 @@ class Subscribe(Capability):
         topic = msg["topic"]
 
         if Subscribe.topics_glob is not None and Subscribe.topics_glob:
-            self.protocol.log("debug", "Topic security glob enabled, checking topic: " + topic)
+            self.protocol.log(
+                "debug", "Topic security glob enabled, checking topic: " + topic
+            )
             match = False
             for glob in Subscribe.topics_glob:
                 if fnmatch.fnmatch(topic, glob):
                     self.protocol.log(
                         "debug",
-                        "Found match with glob " + glob + ", continuing subscription...",
+                        "Found match with glob "
+                        + glob
+                        + ", continuing subscription...",
                     )
                     match = True
                     break
@@ -255,7 +259,9 @@ class Subscribe(Capability):
                 )
                 return
         else:
-            self.protocol.log("debug", "No topic security glob, not checking subscription.")
+            self.protocol.log(
+                "debug", "No topic security glob, not checking subscription."
+            )
 
         if topic not in self._subscriptions:
             client_id = self.protocol.client_id
@@ -317,7 +323,9 @@ class Subscribe(Capability):
         elif compression == "cbor":
             outgoing_msg = message.get_cbor(outgoing_msg)
         elif compression == "cbor-raw":
-            (secs, nsecs) = self.protocol.node_handle.get_clock().now().seconds_nanoseconds()
+            (secs, nsecs) = (
+                self.protocol.node_handle.get_clock().now().seconds_nanoseconds()
+            )
             outgoing_msg["msg"] = {
                 "secs": secs,
                 "nsecs": nsecs,
