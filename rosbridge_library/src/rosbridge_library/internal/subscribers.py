@@ -35,6 +35,7 @@ from threading import Lock, RLock
 
 from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+
 from rosbridge_library.internal import ros_loader
 from rosbridge_library.internal.message_conversion import msg_class_type_repr
 from rosbridge_library.internal.outgoing_message import OutgoingMessage
@@ -55,7 +56,9 @@ class MultiSubscriber:
     callbacks being called in separate threads, must lock whenever modifying
     or accessing the subscribed clients."""
 
-    def __init__(self, topic, client_id, callback, node_handle, msg_type=None, raw=False):
+    def __init__(
+        self, topic, client_id, callback, node_handle, msg_type=None, raw=False
+    ):
         """Register a subscriber on the specified topic.
 
         Keyword arguments:
@@ -87,7 +90,9 @@ class MultiSubscriber:
         # topic_type is a list of types or None at this point; only one type is supported.
         if topic_type is not None:
             if len(topic_type) > 1:
-                node_handle.get_logger().warning(f"More than one topic type detected: {topic_type}")
+                node_handle.get_logger().warning(
+                    f"More than one topic type detected: {topic_type}"
+                )
             topic_type = topic_type[0]
 
         # Use the established topic type if none was specified
@@ -116,9 +121,15 @@ class MultiSubscriber:
         )
 
         infos = node_handle.get_publishers_info_by_topic(topic)
-        if any(pub.qos_profile.durability == DurabilityPolicy.TRANSIENT_LOCAL for pub in infos):
+        if any(
+            pub.qos_profile.durability == DurabilityPolicy.TRANSIENT_LOCAL
+            for pub in infos
+        ):
             qos.durability = DurabilityPolicy.TRANSIENT_LOCAL
-        if any(pub.qos_profile.reliability == ReliabilityPolicy.BEST_EFFORT for pub in infos):
+        if any(
+            pub.qos_profile.reliability == ReliabilityPolicy.BEST_EFFORT
+            for pub in infos
+        ):
             qos.reliability = ReliabilityPolicy.BEST_EFFORT
 
         # Create the subscriber and associated member variables
@@ -133,7 +144,12 @@ class MultiSubscriber:
         self.callback_group = MutuallyExclusiveCallbackGroup()
 
         self.subscriber = node_handle.create_subscription(
-            msg_class, topic, self.callback, qos, raw=raw, callback_group=self.callback_group
+            msg_class,
+            topic,
+            self.callback,
+            qos,
+            raw=raw,
+            callback_group=self.callback_group,
         )
         self.new_subscriber = None
         self.new_subscriptions = {}
@@ -159,7 +175,9 @@ class MultiSubscriber:
 
         """
         if not ros_loader.get_message_class(msg_type) is self.msg_class:
-            raise TypeConflictException(self.topic, msg_class_type_repr(self.msg_class), msg_type)
+            raise TypeConflictException(
+                self.topic, msg_class_type_repr(self.msg_class), msg_type
+            )
 
     def subscribe(self, client_id, callback):
         """Subscribe the specified client to this subscriber.
@@ -257,7 +275,9 @@ class SubscriberManager:
         self._lock = Lock()
         self._subscribers = {}
 
-    def subscribe(self, client_id, topic, callback, node_handle, msg_type=None, raw=False):
+    def subscribe(
+        self, client_id, topic, callback, node_handle, msg_type=None, raw=False
+    ):
         """Subscribe to a topic
 
         Keyword arguments:
@@ -267,18 +287,19 @@ class SubscriberManager:
         msg_type  -- (optional) the type of the topic
 
         """
+        key = (topic, raw)
         with self._lock:
-            if topic not in self._subscribers:
-                self._subscribers[topic] = MultiSubscriber(
+            if key not in self._subscribers:
+                self._subscribers[key] = MultiSubscriber(
                     topic, client_id, callback, node_handle, msg_type=msg_type, raw=raw
                 )
             else:
-                self._subscribers[topic].subscribe(client_id, callback)
+                self._subscribers[key].subscribe(client_id, callback)
 
             if msg_type is not None and not raw:
-                self._subscribers[topic].verify_type(msg_type)
+                self._subscribers[key].verify_type(msg_type)
 
-    def unsubscribe(self, client_id, topic):
+    def unsubscribe(self, client_id, topic, raw=False):
         """Unsubscribe from a topic
 
         Keyword arguments:
@@ -286,15 +307,16 @@ class SubscriberManager:
         topic     -- the topic to unsubscribe from
 
         """
+        key = (topic, raw)
         with self._lock:
-            if topic not in self._subscribers:
+            if key not in self._subscribers:
                 return
 
-            self._subscribers[topic].unsubscribe(client_id)
+            self._subscribers[key].unsubscribe(client_id)
 
-            if not self._subscribers[topic].has_subscribers():
-                self._subscribers[topic].unregister()
-                del self._subscribers[topic]
+            if not self._subscribers[key].has_subscribers():
+                self._subscribers[key].unregister()
+                del self._subscribers[key]
 
 
 manager = SubscriberManager()
