@@ -3,6 +3,3 @@ skips = ["B101", "B110", "B311"]
 
 [tool.black]
 line-length = 100
-
-[tool.setuptools]
-py-modules = ["rosbridge_library", "rosbridge_server", "rosbridge_msgs"]
